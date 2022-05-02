@@ -1,4 +1,4 @@
-package provider
+package core
 
 type MachineIdProvider interface {
 	SetMachineId(machineId uint64)

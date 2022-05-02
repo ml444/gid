@@ -1,7 +1,7 @@
 package populator
 
 import (
-	"github.com/ml444/gid/server"
+	"github.com/ml444/gid/core"
 	"github.com/ml444/gid/utils"
 	"sync/atomic"
 )
@@ -15,7 +15,7 @@ type AtomicPopulator struct {
 	variant atomic.Value
 }
 
-func (p *AtomicPopulator) PopulateId(id *server.Id, idMeta *server.Meta) {
+func (p *AtomicPopulator) PopulateId(id core.Ider, idMeta core.Metaer) {
 	var varOld Variant
 	var varNew Variant
 	var timestamp uint64
@@ -34,7 +34,7 @@ func (p *AtomicPopulator) PopulateId(id *server.Id, idMeta *server.Meta) {
 
 		if timestamp == varOld.lastTimestamp {
 			sequence++
-			sequence &= idMeta.GetSeqBitsMask()
+			sequence &= idMeta.GetSequenceBitsMask()
 			if sequence == 0 {
 				// 使用自旋锁
 				timestamp = utils.TillNextTimeUnit(varOld.lastTimestamp, id.GetType())
@@ -50,7 +50,7 @@ func (p *AtomicPopulator) PopulateId(id *server.Id, idMeta *server.Meta) {
 		// 如果保存的原来的变量被其他线程改变了，就需要拿到最新的变量，并再次计算和尝试
 		// 如果未被修改，则更新变量，跳出循环
 		if p.variant.CompareAndSwap(varOld, varNew) {
-			id.SetSeq(sequence)
+			id.SetSequence(sequence)
 			id.SetTime(timestamp)
 			break
 		}
@@ -63,4 +63,8 @@ func (p *AtomicPopulator) Reset() {
 		lastTimestamp: 0,
 	}
 	p.variant.Store(v)
+}
+
+func NewAtomicPopulator() *AtomicPopulator {
+	return nil
 }

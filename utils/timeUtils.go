@@ -1,9 +1,8 @@
 package utils
 
 import (
-	"github.com/ml444/gid/config"
 	"errors"
-	"fmt"
+	"github.com/ml444/gid"
 	"strconv"
 	"time"
 )
@@ -49,9 +48,9 @@ func TillNextTimeUnit(lastTimestamp uint64, idType uint64) uint64 {
 
 func GenTime(idType uint64) uint64 {
 	// 通过EPOCH对时间压缩
-	if idType == config.MaxPeak {
+	if idType == gid.MaxPeak {
 		return uint64((time.Now().UnixNano()/1000000 - EPOCH) / 1000)
-	} else if idType == config.MinGranularity {
+	} else if idType == gid.MinGranularity {
 		return uint64(time.Now().UnixNano()/1000000 - EPOCH)
 	} else {
 		return uint64((time.Now().UnixNano()/1000000 - EPOCH) / 1000)
@@ -59,15 +58,14 @@ func GenTime(idType uint64) uint64 {
 	// return (1509238640744 - EPOCH) / 1000
 }
 
-func TransDuration(timestamp uint64) (uint64, error) {
-	timeStr := strconv.FormatUint(timestamp, 10)
-	fmt.Printf("%T: %s \n", timeStr, timeStr)
+func TransDuration(timestamp int64) (uint64, error) {
+	timeStr := strconv.FormatInt(timestamp, 10)
 	if len(timeStr) == 10 {
-		return uint64((int64(timestamp)*1000 - EPOCH) / 1000), nil
+		return uint64((timestamp*1000 - EPOCH) / 1000), nil
 	} else if len(timeStr) == 13 {
-		return uint64((int64(timestamp) - EPOCH) / 1000), nil
+		return uint64((timestamp - EPOCH) / 1000), nil
 	} else {
-		return 0, errors.New("the timestamp is error")
+		return 0, errors.New("the timestamp is invalided")
 	}
 }
 
@@ -75,7 +73,7 @@ func TransTime(timeDuration, idType uint64) (int64, string) {
 	// 从时间间隔中计算出时间戳
 	//return timeDuration
 	var timestamp int64
-	if idType == config.MaxPeak {
+	if idType == gid.MaxPeak {
 		timestamp = int64(timeDuration*1000) + EPOCH
 		//fmt.Println(timestamp, "MAX_PEAK")
 	} else {

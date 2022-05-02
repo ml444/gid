@@ -8,56 +8,55 @@ ID类型分为最大峰值和最小粒度
 | 版本 | 类型 | 生成方式 | 秒级时间 | 序列号 | 机器ID |
 | 63   | 62  | 60-61  | 59-20   | 19-10 | 0-9   |
 */
-package server
+package gid
 
 import (
-	"github.com/ml444/gid/config"
 	"fmt"
 )
 
 type Meta struct {
-	machineBits   byte
-	seqBits       byte
-	timeBits      byte
-	genMethodBits byte
-	typeBits      byte
-	versionBits   byte
+	machineBits  byte
+	sequenceBits byte
+	timeBits     byte
+	methodBits   byte
+	typeBits     byte
+	versionBits  byte
 }
 
-func (m *Meta) GetMachineBits() byte {
+func (m *Meta) GetDeviceBits() byte {
 	return m.machineBits
 }
 
-func (m *Meta) SetMachineBits(machineBits byte) {
-	m.machineBits = machineBits
+func (m *Meta) SetDeviceBits(deviceBits byte) {
+	m.machineBits = deviceBits
 }
 
-func (m *Meta) GetMachineBitsMask() uint64 {
+func (m *Meta) GetDeviceBitsMask() uint64 {
 	// return -1L ^ -1L << machineBits
 	res := -1 ^ (-1 << m.machineBits)
 	return uint64(res)
 }
 
-func (m *Meta) GetSeqBitsStartPos() byte {
+func (m *Meta) GetSequenceBitsStartPos() byte {
 	return m.machineBits
 }
 
-func (m *Meta) GetSeqBits() byte {
-	return m.seqBits
+func (m *Meta) GetSequenceBits() byte {
+	return m.sequenceBits
 }
 
-func (m *Meta) SetSeqBits(seqBits byte) {
-	m.seqBits = seqBits
+func (m *Meta) SetSequenceBits(seqBits byte) {
+	m.sequenceBits = seqBits
 }
 
-func (m *Meta) GetSeqBitsMask() uint64 {
-	// return -1L ^ -1L << seqBits
-	res := -1 ^ (-1 << m.seqBits)
+func (m *Meta) GetSequenceBitsMask() uint64 {
+	// return -1L ^ -1L << sequenceBits
+	res := -1 ^ (-1 << m.sequenceBits)
 	return uint64(res)
 }
 
 func (m *Meta) GetTimeBitsStartPos() byte {
-	return m.machineBits + m.seqBits
+	return m.machineBits + m.sequenceBits
 }
 
 func (m *Meta) GetTimeBits() byte {
@@ -74,46 +73,46 @@ func (m *Meta) GetTimeBitsMask() uint64 {
 	return uint64(res)
 }
 
-func (m *Meta) GetGenMethodBitsStartPos() byte {
-	return m.machineBits + m.seqBits + m.timeBits
+func (m *Meta) GetMethodBitsStartPos() byte {
+	return m.machineBits + m.sequenceBits + m.timeBits
 }
 
-func (m *Meta) GetGenMethodBits() byte {
-	return m.genMethodBits
+func (m *Meta) GetMethodBits() byte {
+	return m.methodBits
 }
 
-func (m *Meta) SetGenMethodBits(genMethodBits byte) {
-	m.genMethodBits = genMethodBits
+func (m *Meta) SetMethodBits(genMethodBits byte) {
+	m.methodBits = genMethodBits
 }
 
-func (m *Meta) GetGenMethodBitsMask() uint64 {
-	// return -1L ^ -1L << genMethodBits
-	res := -1 ^ (-1 << m.genMethodBits)
+func (m *Meta) GetMethodBitsMask() uint64 {
+	// return -1L ^ -1L << methodBits
+	res := -1 ^ (-1 << m.methodBits)
 	return uint64(res)
 }
 
-func (m *Meta) GetMtypeBitsStartPos() byte {
+func (m *Meta) GetTypeBitsStartPos() byte {
 	// 10+10+30+2
 	// 10+20+20+2
-	return m.machineBits + m.seqBits + m.timeBits + m.genMethodBits
+	return m.machineBits + m.sequenceBits + m.timeBits + m.methodBits
 }
 
-func (m *Meta) GetMtypeBits() byte {
+func (m *Meta) GetTypeBits() byte {
 	return m.typeBits
 }
 
-func (m *Meta) SetMtypeBits(typeBits byte) {
+func (m *Meta) SetTypeBits(typeBits byte) {
 	m.typeBits = typeBits
 }
 
-func (m *Meta) GetMtypeBitsMask() uint64 {
+func (m *Meta) GetTypeBitsMask() uint64 {
 	// return -1L ^ -1L << mtypeBits
 	res := -1 ^ (-1 << m.typeBits)
 	return uint64(res)
 }
 
 func (m *Meta) GetVersionBitsStartPos() byte {
-	return (m.machineBits + m.seqBits + m.timeBits + m.genMethodBits + m.typeBits)
+	return (m.machineBits + m.sequenceBits + m.timeBits + m.methodBits + m.typeBits)
 }
 
 func (m *Meta) GetVersionBits() byte {
@@ -137,18 +136,18 @@ func (m *Meta) GetVersionBitsMask() uint64 {
 // }
 
 func NewIdMeta(idType uint64) *Meta {
-	if idType == config.MaxPeak {
+	if idType == MaxPeak {
 		fmt.Println("选择最大峰值模式")
 		return &Meta{
-			machineBits:   10,
-			seqBits:       20,
-			timeBits:      30,
-			genMethodBits: 2,
-			typeBits:      1,
-			versionBits:   1,
+			machineBits:  10,
+			sequenceBits: 20,
+			timeBits:     30,
+			methodBits:   2,
+			typeBits:     1,
+			versionBits:  1,
 			// 10, 20, 30, 2, 1, 1
 		}
-	} else if idType == config.MinGranularity {
+	} else if idType == MinGranularity {
 		fmt.Println("选择最小粒度模式")
 		return &Meta{10, 10, 40, 2, 1, 1}
 	} else {

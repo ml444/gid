@@ -1,9 +1,9 @@
 package populator
 
 import (
-	"github.com/ml444/gid/server"
-	"github.com/ml444/gid/utils"
 	"fmt"
+	"github.com/ml444/gid/core"
+	"github.com/ml444/gid/utils"
 	"os"
 )
 
@@ -12,7 +12,7 @@ type basePopulator struct {
 	lastTimestamp uint64 //= -1
 }
 
-func (p *basePopulator) populateId(id *server.Id, idMeta *server.Meta) {
+func (p *basePopulator) populateId(id core.Ider, idMeta core.Metaer) {
 	timestamp := utils.GenTime(id.GetType())
 	isValid := utils.ValidateTimestamp(p.lastTimestamp, timestamp)
 	if isValid != true {
@@ -26,7 +26,7 @@ func (p *basePopulator) populateId(id *server.Id, idMeta *server.Meta) {
 	if timestamp == p.lastTimestamp {
 		// fmt.Println("没到下一秒，叠加！！！", p)
 		p.sequence++
-		p.sequence = p.sequence & idMeta.GetSeqBitsMask()
+		p.sequence = p.sequence & idMeta.GetSequenceBitsMask()
 		// fmt.Println("没到下一秒，叠加！！！", p.sequence)
 		if p.sequence == 0 {
 			timestamp = utils.TillNextTimeUnit(p.lastTimestamp, id.GetType())
@@ -36,11 +36,11 @@ func (p *basePopulator) populateId(id *server.Id, idMeta *server.Meta) {
 		p.lastTimestamp = timestamp
 		p.sequence = 0
 	}
-	id.SetSeq(p.sequence)
+	id.SetSequence(p.sequence)
 	id.SetTime(p.lastTimestamp)
 }
 
-func (p *basePopulator) PopulateId(id *server.Id, idMeta *server.Meta) {
+func (p *basePopulator) PopulateId(id core.Ider, idMeta core.Metaer) {
 	p.populateId(id, idMeta)
 }
 func (p *basePopulator) Reset() {
@@ -66,7 +66,7 @@ func PrintType(args ...interface{}) {
 			os.Stdout.WriteString("")
 		}
 		switch t := arg.(type) {
-		case Populater:
+		case core.Populater:
 			os.Stdout.WriteString("Populater")
 		case SyncIdPopulator:
 			os.Stdout.WriteString("SyncIdPopulator")
