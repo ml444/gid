@@ -1,21 +1,24 @@
-package populator
+package filler
 
 import (
 	"github.com/ml444/gid/core"
-	"github.com/ml444/gid/utils"
 	"sync/atomic"
 )
 
+var _ core.IFiller = &AtomicFiller{}
+
 type Variant struct {
-	sequence     uint64
+	sequence      uint64
 	lastTimestamp uint64
 }
 
-type AtomicPopulator struct {
+type AtomicFiller struct {
 	variant atomic.Value
+	meta    core.IMeta
+	timeOp  core.ITimeOp
 }
 
-func (p *AtomicPopulator) PopulateId(id core.Ider, idMeta core.Metaer) {
+func (p *AtomicFiller) PopulateId(id core.IId) {
 	var varOld Variant
 	var varNew Variant
 	var timestamp uint64
@@ -26,18 +29,18 @@ func (p *AtomicPopulator) PopulateId(id core.Ider, idMeta core.Metaer) {
 		varOld = p.variant.Load().(Variant)
 
 		// 基于原来的变量计算新的时间和序列号
-		timestamp = utils.GenTime(id.GetType())
+		timestamp = p.timeOp.TimeNow()
 
-		utils.ValidateTimestamp(varOld.lastTimestamp, timestamp) // 校验时间是否被回调变慢了
+		p.timeOp.ValidateTimestamp(varOld.lastTimestamp, timestamp) // 校验时间是否被回调变慢了
 
 		sequence = varOld.sequence
 
 		if timestamp == varOld.lastTimestamp {
 			sequence++
-			sequence &= idMeta.GetSequenceBitsMask()
+			sequence &= p.meta.GetSequenceBitsMask()
 			if sequence == 0 {
 				// 使用自旋锁
-				timestamp = utils.TillNextTimeUnit(varOld.lastTimestamp, id.GetType())
+				timestamp = p.timeOp.WaitNextTime(varOld.lastTimestamp)
 			}
 		} else {
 			sequence = 0
@@ -57,7 +60,7 @@ func (p *AtomicPopulator) PopulateId(id core.Ider, idMeta core.Metaer) {
 	}
 }
 
-func (p *AtomicPopulator) Reset() {
+func (p *AtomicFiller) Reset() {
 	v := Variant{
 		sequence:      0,
 		lastTimestamp: 0,
@@ -65,6 +68,8 @@ func (p *AtomicPopulator) Reset() {
 	p.variant.Store(v)
 }
 
-func NewAtomicPopulator() *AtomicPopulator {
-	return nil
+func NewAtomicFiller(meta core.IMeta, timeOp core.ITimeOp) *AtomicFiller {
+	f := AtomicFiller{variant: atomic.Value{}, meta: meta, timeOp: timeOp}
+	f.Reset()
+	return &f
 }

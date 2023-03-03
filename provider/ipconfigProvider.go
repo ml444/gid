@@ -4,7 +4,6 @@ package provider
 // 运行时每个服务节点根据本机IP取得IP映射中的值作为自己的机器号。
 
 import (
-	"github.com/ml444/gid/utils"
 	"strings"
 )
 
@@ -14,7 +13,7 @@ type IpConfigurableMachineIdProvider struct {
 }
 
 func (p IpConfigurableMachineIdProvider) init(ips string) {
-	ip := utils.GetHostIp()
+	ip := GetHostIp()
 
 	// if (ip == "") {
 	// 	msg := "Fail to get host IP address. Stop to initialize the IpConfigurableMachineIdProvider provider.";
@@ -57,4 +56,12 @@ func (p IpConfigurableMachineIdProvider) GetMachineId() int {
 
 func (p IpConfigurableMachineIdProvider) SetMachineId(machineId int) {
 	p.machineId = machineId
+}
+
+func GetHostIp() string {
+	return "127.0.0.1"
+}
+
+func GetHostName() string {
+	return "www.cml.com"
 }

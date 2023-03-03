@@ -1,19 +1,19 @@
-package gid
+package core
 
-import (
-	"github.com/ml444/gid/core"
-)
-
-
-type Convertor struct {
-	meta core.Metaer
+type IConverter interface {
+	ConvertToGen(id IId) uint64      // 合成一个长整型的ID
+	ConvertToExp(id uint64, out IId) // 拆解长整型的ID
 }
 
-func NewConvertor(meta core.Metaer) *Convertor {
+type Convertor struct {
+	meta IMeta
+}
+
+func NewConvertor(meta IMeta) *Convertor {
 	return &Convertor{meta: meta}
 }
 
-func (c *Convertor) ConvertToGen(id core.Ider) uint64 {
+func (c *Convertor) ConvertToGen(id IId) uint64 {
 	ret := uint64(0)
 	ret |= id.GetDevice()
 	ret |= id.GetSequence() << c.meta.GetSequenceBitsStartPos()
@@ -24,7 +24,7 @@ func (c *Convertor) ConvertToGen(id core.Ider) uint64 {
 	return ret
 }
 
-func (c *Convertor) ConvertToExp(id uint64, out core.Ider) {
+func (c *Convertor) ConvertToExp(id uint64, out IId) {
 	out.SetDevice(id & c.meta.GetDeviceBitsMask())
 	out.SetSequence((id >> c.meta.GetSequenceBitsStartPos()) & c.meta.GetSequenceBitsMask())
 	out.SetTime((id >> c.meta.GetTimeBitsStartPos()) & c.meta.GetTimeBitsMask())
