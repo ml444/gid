@@ -2,99 +2,83 @@ package gid
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
-	"github.com/ml444/gid/core"
-	"github.com/ml444/gid/filler"
 	"strconv"
 	"sync"
+
+	"github.com/ml444/gid/core"
+	"github.com/ml444/gid/strategy"
 )
+
+var _ IdServer = &IdGenerator{}
 
 type IdServer interface {
 	GenerateId() uint64
-	ExplainId(id uint64) *core.Id
-	MakeId(timestamp int64, seq int64) uint64
+	ExplainId(id uint64) []uint64
+	MakeId(timestamp int64, sequence uint64) (uint64, error)
 	TransTime(time uint64) (int64, string)
 }
 
 type IdGenerator struct {
-	Version  uint64
-	Type     uint64
-	Method   uint64
-	DeviceId uint64
-
-	fillerType FillerType
-	meta       core.IMeta
-	filler     core.IFiller
-	convertor  core.IConverter
-	timeOp     core.ITimeOp
-
-	idPool sync.Pool
+	seqIdx   int
+	meta     *core.Meta
+	strategy core.IStrategy
+	timeOp   core.ITimeOp
+	dataPool sync.Pool
 }
 
-func NewIdGenerator(opts ...OptionFunc) *IdGenerator {
-	idGen := IdGenerator{}
+func NewIdGenerator(tsIdx, seqIdx int, kv map[int]uint64, bitset []uint8, epoch int64, opts ...OptionFunc) (*IdGenerator, error) {
+	lenBitset := len(bitset)
+	if lenBitset == 0 || tsIdx >= lenBitset || seqIdx >= lenBitset {
+		return nil, fmt.Errorf("the length of the bitset incoming parameter is error: %d", lenBitset)
+	}
+	if len(kv) != lenBitset {
+		panic("the length and order of the incoming parameters kv and bitset should be consistent")
+	}
+	if len(strconv.FormatInt(epoch, 10)) != 13 {
+		return nil, errors.New("incorrect length of incoming epoch")
+	}
+	timeUnit := core.TimeUnitMilliSecond
+	if timeBit := bitset[tsIdx]; timeBit <= 33 {
+		timeUnit = core.TimeUnitSecond
+	}
+	timeOp, err := core.NewTimeOp(epoch, timeUnit)
+	if err != nil {
+		return nil, err
+	}
+	idGen := IdGenerator{
+		seqIdx: seqIdx,
+		meta:   core.NewMeta(bitset...),
+		timeOp: timeOp,
+	}
 	for _, optFunc := range opts {
 		optFunc(&idGen)
 	}
-	if idGen.Version == 0 {
-		panic("IdGenerator.Version need to be set")
-	}
-	if idGen.Type == 0 {
-		panic("IdGenerator.Type need to be set")
-	}
-	if idGen.meta == nil || idGen.timeOp == nil {
-		panic("IdGenerator.meta or IdGenerator.timeOp need to be set")
-	}
-	if idGen.Method == 0 {
-		panic("IdGenerator.Method need to be set")
-	}
-	if idGen.DeviceId == 0 {
-		panic("IdGenerator.DeviceId need to be set")
-	}
-	if idGen.filler == nil {
-		if idGen.fillerType == 0 {
-			panic("IdGenerator.filler need to be set")
-		}
-		switch idGen.fillerType {
-		case FillerTypeSync:
-			idGen.filler = filler.NewSyncFiller(idGen.meta, idGen.timeOp)
-		case FillerTypeAtomic:
-			idGen.filler = filler.NewAtomicFiller(idGen.meta, idGen.timeOp)
-		case FillerTypeLock:
-			idGen.filler = filler.NewLockFiller(idGen.meta, idGen.timeOp)
-		default:
-			panic("other types of filler are not supported yet")
-		}
+	if idGen.strategy == nil {
+		// default strategy
+		idGen.strategy = strategy.NewAtomicFiller(idGen.meta.GetBitMask(seqIdx), idGen.timeOp)
 	}
 
-	if idGen.filler == nil {
-
+	idGen.dataPool.New = func() interface{} {
+		return core.NewData(tsIdx, seqIdx, kv)
 	}
-	if idGen.convertor == nil {
-		idGen.convertor = core.NewConvertor(idGen.meta)
-	}
-	idGen.idPool.New = func() interface{} {
-		return core.NewId(idGen.Version, idGen.Type, idGen.Method, idGen.DeviceId)
-	}
-	return &idGen
+	return &idGen, nil
 }
 
 // GenerateId generate globally unique id.
 func (s *IdGenerator) GenerateId() uint64 {
-	id := s.idPool.Get().(*core.Id)
-	defer s.idPool.Put(id)
-	s.populateId(id) // 这是一个抽象方法，调用子类的
-	return s.convertor.ConvertToGen(id)
-}
-func (s *IdGenerator) GenerateId2() uint64 {
-	id := s.idPool.Get().(*core.Id)
-	defer s.idPool.Put(id)
-	return s.convertor.ConvertToGen(id)
+	d := s.dataPool.Get().(*core.Data)
+	defer s.dataPool.Put(d)
+	duration, sequence := s.strategy.Caught() // 这是一个抽象方法，调用子类的
+	d.SetTimeDuration(duration)
+	d.SetSequence(sequence)
+	return s.meta.ConvertToGen(d)
 }
 
 // ExplainId parse the components of the unique id.
-func (s *IdGenerator) ExplainId(id uint64, out core.IId) {
-	s.convertor.ConvertToExp(id, out)
+func (s *IdGenerator) ExplainId(id uint64) []uint64 {
+	return s.meta.ConvertToExp(id)
 }
 
 // MakeId According to the incoming timestamp and sequence parameters,
@@ -105,26 +89,16 @@ func (s *IdGenerator) MakeId(timestamp int64, sequence uint64) (uint64, error) {
 		return 0, err
 	}
 
-	id := s.idPool.Get().(*core.Id)
-	defer s.idPool.Put(id)
-	id.SetSequence(sequence)
-	id.SetTime(timeDuration)
-	return s.convertor.ConvertToGen(id), nil
+	d := s.dataPool.Get().(*core.Data)
+	defer s.dataPool.Put(d)
+	d.SetSequence(sequence)
+	d.SetTimeDuration(timeDuration)
+	return s.meta.ConvertToGen(d), nil
 }
 
 // TransTime 转换时间
 func (s *IdGenerator) TransTime(timeDuration uint64) (int64, string) {
 	return s.timeOp.ParseDuration(timeDuration)
-}
-
-func (s *IdGenerator) populateId(id *core.Id) {
-	// 填充ID
-	s.filler.PopulateId(id)
-}
-
-func (s *IdGenerator) SetIdPopulator(idPopulator core.IFiller) {
-	// 设置填充器
-	s.filler = idPopulator
 }
 
 type LongId uint64

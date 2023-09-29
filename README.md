@@ -1,14 +1,24 @@
 # gid
 Global ID Component Based on Snowflake Algorithm.
 
+## Bit patterns for ID
+1. Classic snowflake pattern
+    ```
+    【Snowflake】：
+    | version | time(ms) | machineID | sequence |
+    | 63      | 62-22    | 21-12     | 11-0     |
+    ```
 
-```text
-ID类型分为最大峰值和最小粒度
-【最大峰值】：
-| 版本 | 类型 | 生成方式 | 秒级时间 | 序列号 | 机器ID |
-| 63   | 62  | 60-61  | 59-30   | 29-10 | 0-9   |
+2. Maximum Peak pattern
+    ```
+    【Max-Peak】：
+    | version | generate-mode | time(s) | machineID | sequence |
+    | 63      | 62-61         | 60-30   | 29-20     | 19-0     |
+    ```
 
-【最小粒度】：
-| 版本 | 类型 | 生成方式 | 秒级时间 | 序列号 | 机器ID |
-| 63   | 62  | 60-61  | 59-20   | 19-10 | 0-9   |
-```
+3. Minimum granularity pattern
+    ```
+    【Min-Granularity】：
+    | version | generate-mode | time(ms) | machineID | sequence |
+    | 63      | 62-61         | 60-20    | 19-10     | 9-0      |
+    ```

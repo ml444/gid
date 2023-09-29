@@ -1,74 +1,34 @@
 package gid
 
-import "github.com/ml444/gid/core"
+import (
+	"github.com/ml444/gid/core"
+	"github.com/ml444/gid/strategy"
+)
 
-type IdType uint64
-type FillerType uint8
+type StrategyType uint8
 
-const EPOCH = int64(1610351662000) //起始时间，预计可用34+34年
 const (
-	MinGranularity IdType = 0 // 最小颗粒度
-	MaxPeak        IdType = 1 // 最大峰值
-
-	FillerTypeSync   FillerType = 1
-	FillerTypeAtomic FillerType = 2
-	FillerTypeLock   FillerType = 3
+	StrategyTypeSync   StrategyType = 1
+	StrategyTypeAtomic StrategyType = 2
+	StrategyTypeLock   StrategyType = 3
 )
 
 type OptionFunc func(*IdGenerator)
 
-func SetVersionOption(version uint64) OptionFunc {
+func SetStrategyByTypeOption(strategyType StrategyType) OptionFunc {
 	return func(ig *IdGenerator) {
-		ig.Version = version
-	}
-}
-
-func SetTypeOption(typ IdType, epoch int64) OptionFunc {
-	return func(ig *IdGenerator) {
-		if epoch <= 0 {
-			panic("epoch must be gather than 0")
-		}
-		ig.Type = uint64(typ)
-		switch typ {
-		case MaxPeak:
-			//fmt.Println("选择最大峰值模式")
-			ig.meta = core.NewMetaWithMaxPeak()
-			ig.timeOp = core.NewTimeOpWithMaxPeak(epoch)
-		case MinGranularity:
-			//fmt.Println("选择最小粒度模式")
-			ig.meta = core.NewMetaWithMinGranularity()
-			ig.timeOp = core.NewTimeOpWithMinGranularity(epoch)
-		default:
-			panic("other types are not supported yet")
+		switch strategyType {
+		case StrategyTypeSync:
+			ig.strategy = strategy.NewSyncFiller(ig.meta.GetBitMask(ig.seqIdx), ig.timeOp)
+		case StrategyTypeAtomic:
+			ig.strategy = strategy.NewAtomicFiller(ig.meta.GetBitMask(ig.seqIdx), ig.timeOp)
+		case StrategyTypeLock:
+			ig.strategy = strategy.NewLockFiller(ig.meta.GetBitMask(ig.seqIdx), ig.timeOp)
 		}
 	}
 }
-
-func SetMethodOption(method uint64) OptionFunc {
+func SetStrategyOption(strategy core.IStrategy) OptionFunc {
 	return func(ig *IdGenerator) {
-		ig.Method = method
-	}
-}
-
-func SetDeviceIdOption(di uint64) OptionFunc {
-	return func(ig *IdGenerator) {
-		ig.DeviceId = di
-	}
-}
-
-func SetFillerTypeOption(fTyp FillerType) OptionFunc {
-	return func(ig *IdGenerator) {
-		ig.fillerType = fTyp
-	}
-}
-func SetFillerOption(f core.IFiller) OptionFunc {
-	return func(ig *IdGenerator) {
-		ig.filler = f
-	}
-}
-
-func SetConverterOption(c core.IConverter) OptionFunc {
-	return func(ig *IdGenerator) {
-		ig.convertor = c
+		ig.strategy = strategy
 	}
 }

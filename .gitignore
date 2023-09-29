@@ -15,4 +15,3 @@
 # vendor/
 
 .idea/
-*_test.go
