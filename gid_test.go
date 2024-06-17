@@ -5,6 +5,7 @@ import "testing"
 const EPOCH = int64(1610351662000) //起始时间，预计可用34+34年
 
 func BenchmarkStrategyAtomic(b *testing.B) {
+	b.ReportAllocs()
 	ig, err := NewSnowflakeIdGenerator(EPOCH, 1, 0, SetStrategyByTypeOption(StrategyTypeAtomic))
 	if err != nil {
 		b.Error(err.Error())

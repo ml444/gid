@@ -19,11 +19,11 @@ func SetStrategyByTypeOption(strategyType StrategyType) OptionFunc {
 	return func(ig *IdGenerator) {
 		switch strategyType {
 		case StrategyTypeSync:
-			ig.strategy = strategy.NewSyncFiller(ig.meta.GetBitMask(ig.seqIdx), ig.timeOp)
+			ig.strategy = strategy.NewSyncFiller(ig.meta.SequenceBitMask, ig.timeOp)
 		case StrategyTypeAtomic:
-			ig.strategy = strategy.NewAtomicFiller(ig.meta.GetBitMask(ig.seqIdx), ig.timeOp)
+			ig.strategy = strategy.NewAtomicFiller(ig.meta.SequenceBitMask, ig.timeOp)
 		case StrategyTypeLock:
-			ig.strategy = strategy.NewLockFiller(ig.meta.GetBitMask(ig.seqIdx), ig.timeOp)
+			ig.strategy = strategy.NewLockFiller(ig.meta.SequenceBitMask, ig.timeOp)
 		}
 	}
 }

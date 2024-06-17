@@ -1,13 +1,15 @@
 package gid
 
-func NewMaxPeakIdGenerator(epoch int64, deviceId, mode, version uint64, opts ...OptionFunc) (IdServer, error) {
-	g, err := NewIdGenerator(2, 0, map[int]uint64{
-		0: 0,        // sequence
-		1: deviceId, // deviceId
-		2: 0,        //timeDuration
-		3: mode,     // mode: embed|rpc|http
-		4: version,  // version
-	}, []uint8{20, 10, 31, 2, 1}, epoch, opts...)
+func NewMaxPeakIdGenerator(epoch int64, deviceId, mode, version uint64, opts ...OptionFunc) (IGenerator, error) {
+	g, err := NewIdGenerator(&Config{
+		Epoch:  epoch,
+		WorkID: deviceId,
+		SegmentBits: &SegmentBits{
+			DurationBits: 31,
+			WorkerIDBits: 10,
+			SequenceBits: 22,
+		},
+	}, opts...)
 	if err != nil {
 		return nil, err
 	}

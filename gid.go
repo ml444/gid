@@ -4,81 +4,72 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"strconv"
-	"sync"
-
 	"github.com/ml444/gid/core"
 	"github.com/ml444/gid/strategy"
+	"strconv"
 )
 
-var _ IdServer = &IdGenerator{}
+var _ IGenerator = &IdGenerator{}
 
-type IdServer interface {
+type IGenerator interface {
 	GenerateId() uint64
-	ExplainId(id uint64) []uint64
+	ExplainId(id uint64) *IDComponents
 	MakeId(timestamp int64, sequence uint64) (uint64, error)
 	TransTime(time uint64) (int64, string)
 }
 
 type IdGenerator struct {
-	seqIdx   int
+	workerID uint64
 	meta     *core.Meta
 	strategy core.IStrategy
 	timeOp   core.ITimeOp
-	dataPool sync.Pool
 }
 
-func NewIdGenerator(tsIdx, seqIdx int, kv map[int]uint64, bitset []uint8, epoch int64, opts ...OptionFunc) (*IdGenerator, error) {
-	lenBitset := len(bitset)
-	if lenBitset == 0 || tsIdx >= lenBitset || seqIdx >= lenBitset {
-		return nil, fmt.Errorf("the length of the bitset incoming parameter is error: %d", lenBitset)
+func NewIdGenerator(cfg *Config, opts ...OptionFunc) (*IdGenerator, error) {
+	if cfg == nil || cfg.SegmentBits == nil {
+		return nil, fmt.Errorf("config is error: %v", cfg)
 	}
-	if len(kv) != lenBitset {
-		panic("the length and order of the incoming parameters kv and bitset should be consistent")
-	}
-	if len(strconv.FormatInt(epoch, 10)) != 13 {
+
+	if len(strconv.FormatInt(cfg.Epoch, 10)) != 13 {
 		return nil, errors.New("incorrect length of incoming epoch")
 	}
 	timeUnit := core.TimeUnitMilliSecond
-	if timeBit := bitset[tsIdx]; timeBit <= 33 {
-		timeUnit = core.TimeUnitSecond
-	}
-	timeOp, err := core.NewTimeOp(epoch, timeUnit)
+	//if timeBit := bitset[tsIdx]; timeBit <= 33 {
+	//	timeUnit = core.TimeUnitSecond
+	//}
+	timeOp, err := core.NewTimeOp(cfg.Epoch, timeUnit)
 	if err != nil {
 		return nil, err
 	}
 	idGen := IdGenerator{
-		seqIdx: seqIdx,
-		meta:   core.NewMeta(bitset...),
-		timeOp: timeOp,
+		workerID: cfg.WorkID,
+		meta:     core.NewMeta(cfg.SegmentBits),
+		timeOp:   timeOp,
 	}
 	for _, optFunc := range opts {
 		optFunc(&idGen)
 	}
 	if idGen.strategy == nil {
 		// default strategy
-		idGen.strategy = strategy.NewAtomicFiller(idGen.meta.GetBitMask(seqIdx), idGen.timeOp)
+		idGen.strategy = strategy.NewAtomicFiller(idGen.meta.SequenceBitMask, idGen.timeOp)
 	}
 
-	idGen.dataPool.New = func() interface{} {
-		return core.NewData(tsIdx, seqIdx, kv)
-	}
 	return &idGen, nil
 }
 
-// GenerateId generate globally unique id.
 func (s *IdGenerator) GenerateId() uint64 {
-	d := s.dataPool.Get().(*core.Data)
-	defer s.dataPool.Put(d)
 	duration, sequence := s.strategy.Caught() // 这是一个抽象方法，调用子类的
-	d.SetTimeDuration(duration)
-	d.SetSequence(sequence)
-	return s.meta.ConvertToGen(d)
+	d := IDComponents{
+		Duration: duration,
+		WorkerID: s.workerID,
+		Sequence: sequence,
+	}
+	return s.meta.Generate(&d)
 }
 
 // ExplainId parse the components of the unique id.
-func (s *IdGenerator) ExplainId(id uint64) []uint64 {
-	return s.meta.ConvertToExp(id)
+func (s *IdGenerator) ExplainId(id uint64) *IDComponents {
+	return s.meta.Parse(id)
 }
 
 // MakeId According to the incoming timestamp and sequence parameters,
@@ -88,12 +79,12 @@ func (s *IdGenerator) MakeId(timestamp int64, sequence uint64) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-
-	d := s.dataPool.Get().(*core.Data)
-	defer s.dataPool.Put(d)
-	d.SetSequence(sequence)
-	d.SetTimeDuration(timeDuration)
-	return s.meta.ConvertToGen(d), nil
+	d := IDComponents{
+		Duration: timeDuration,
+		WorkerID: s.workerID,
+		Sequence: sequence,
+	}
+	return s.meta.Generate(&d), nil
 }
 
 // TransTime 转换时间
